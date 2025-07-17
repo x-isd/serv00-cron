@@ -17,6 +17,43 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
+# 确保sshpass可用 - Koyeb环境自动安装
+def ensure_sshpass():
+    """确保sshpass命令可用，如果不可用则自动安装"""
+    try:
+        # 检查sshpass是否可用
+        result = subprocess.run(['sshpass', '-V'], capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            print("✅ sshpass已可用")
+            return True
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        print("⚠️ sshpass不可用，尝试安装...")
+    
+    try:
+        # 更新包列表
+        print("📦 更新包列表...")
+        subprocess.run(['apt-get', 'update'], check=True, timeout=60)
+        
+        # 安装sshpass
+        print("🔧 安装sshpass...")
+        subprocess.run(['apt-get', 'install', '-y', 'sshpass'], check=True, timeout=120)
+        
+        # 验证安装
+        result = subprocess.run(['sshpass', '-V'], capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            print("✅ sshpass安装成功")
+            return True
+        else:
+            print("❌ sshpass安装失败")
+            return False
+            
+    except subprocess.CalledProcessError as e:
+        print(f"❌ 安装sshpass时发生错误: {e}")
+        return False
+    except subprocess.TimeoutExpired:
+        print("❌ 安装sshpass超时")
+        return False
+
 def execute_ssh_command(host, port, username, password, command):
     """
     使用sshpass执行SSH命令（与原始Python脚本完全相同的方式）
@@ -157,17 +194,17 @@ if __name__ == "__main__":
     print("📡 基于原始Python脚本，100%兼容")
     print("🔧 使用sshpass命令执行SSH连接")
     
-    # 检查sshpass可用性
-    try:
-        result = subprocess.run(['sshpass', '-V'], capture_output=True, check=True)
-        print("✅ sshpass命令可用")
-        print(f"版本信息: {result.stderr.decode().strip()}")
-    except FileNotFoundError:
-        print("❌ sshpass命令未找到")
-        print("请确保系统已安装sshpass")
-    except subprocess.CalledProcessError as e:
-        print(f"⚠️ sshpass命令检查失败: {e}")
+    # 应用启动时确保sshpass可用
+    print("🔍 检查sshpass可用性...")
+    sshpass_available = ensure_sshpass()
+    
+    if sshpass_available:
+        print("✅ sshpass准备就绪，SSH功能可正常使用")
+    else:
+        print("⚠️ 警告: sshpass不可用，SSH功能可能无法正常工作")
+        print("💡 建议: 检查系统权限或使用Docker方案")
     
     # 启动Flask服务
     port = int(os.environ.get('PORT', 8000))
+    print(f"🌐 启动Flask服务，端口: {port}")
     app.run(host='0.0.0.0', port=port, debug=False)
