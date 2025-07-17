@@ -1,4 +1,4 @@
-// Node.js版SSH代理服务 - 使用sshpass命令（与原始Python脚本相同方式）
+// Node.js版SSH代理服务 - 智能选择sshpass或ssh2库
 // 可以部署在Koyeb、Cyclic、Render等Node.js平台
 
 const express = require('express');
@@ -11,6 +11,24 @@ const PORT = process.env.PORT || 3000;
 // 中间件
 app.use(cors());
 app.use(express.json());
+
+// 全局变量：sshpass可用性检测结果
+let sshpassAvailable = null;
+
+// 检测sshpass是否可用
+function checkSshpassAvailability() {
+  return new Promise((resolve) => {
+    exec('which sshpass', (error, stdout, stderr) => {
+      if (error) {
+        console.log('❌ sshpass不可用，将使用ssh2库作为备用方案');
+        resolve(false);
+      } else {
+        console.log('✅ sshpass可用，将优先使用sshpass命令');
+        resolve(true);
+      }
+    });
+  });
+}
 
 // 转义Shell命令中的特殊字符
 function escapeShellArg(arg) {
@@ -25,12 +43,23 @@ function executeSSHCommand(host, port, username, password, command) {
     const escapedCommand = escapeShellArg(command);
     const sshCommand = `sshpass -p ${escapedPassword} ssh -o StrictHostKeyChecking=no -p ${port} ${username}@${host} ${escapedCommand}`;
     
-    console.log(`执行SSH命令: ${username}@${host}:${port}`);
+    console.log(`执行SSH命令 (sshpass): ${username}@${host}:${port}`);
     
     // 执行命令，设置30秒超时
     exec(sshCommand, { timeout: 30000 }, (error, stdout, stderr) => {
       if (error) {
         console.error(`SSH命令执行失败: ${host} - ${error.message}`);
+        
+        // 检查是否是sshpass不存在的错误
+        if (error.message.includes('sshpass: not found') || error.message.includes('command not found')) {
+          resolve({
+            success: false,
+            error: 'sshpass命令不可用',
+            method: 'sshpass',
+            fallbackNeeded: true
+          });
+          return;
+        }
         
         // 检查是否是超时错误
         if (error.killed && error.signal === 'SIGTERM') {
@@ -160,12 +189,33 @@ app.post('/execute', async (req, res) => {
   try {
     let result;
     
-    // 根据方法选择执行方式，默认使用sshpass（推荐）
+    // 如果用户强制指定使用ssh2，直接使用
     if (method === 'ssh2') {
       result = await executeSSH2Command(host, port, username, password, command);
     } else {
-      // 默认使用sshpass（与原始Python脚本相同）
-      result = await executeSSHCommand(host, port, username, password, command);
+      // 智能选择：优先尝试sshpass，失败时自动回退到ssh2
+      
+      // 首次检测sshpass可用性（缓存结果）
+      if (sshpassAvailable === null) {
+        sshpassAvailable = await checkSshpassAvailability();
+      }
+      
+      if (sshpassAvailable) {
+        // sshpass可用，尝试使用
+        result = await executeSSHCommand(host, port, username, password, command);
+        
+        // 如果sshpass执行失败且需要回退，使用ssh2
+        if (!result.success && result.fallbackNeeded) {
+          console.log('🔄 sshpass执行失败，自动回退到ssh2库');
+          result = await executeSSH2Command(host, port, username, password, command);
+          result.fallbackUsed = true;
+        }
+      } else {
+        // sshpass不可用，直接使用ssh2
+        console.log('🔄 sshpass不可用，直接使用ssh2库');
+        result = await executeSSH2Command(host, port, username, password, command);
+        result.sshpassUnavailable = true;
+      }
     }
     
     res.json(result);
@@ -180,21 +230,34 @@ app.post('/execute', async (req, res) => {
 });
 
 // 健康检查接口
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    service: 'SSH Proxy Node.js (sshpass)',
+app.get('/health', async (req, res) => {
+  // 检测sshpass可用性
+  if (sshpassAvailable === null) {
+    sshpassAvailable = await checkSshpassAvailability();
+  }
+  
+  res.json({
+    status: 'ok',
+    service: 'SSH Proxy Node.js (智能选择)',
     methods: ['sshpass', 'ssh2'],
-    timestamp: new Date().toISOString() 
+    sshpassAvailable: sshpassAvailable,
+    primaryMethod: sshpassAvailable ? 'sshpass' : 'ssh2',
+    fallbackMethod: sshpassAvailable ? 'ssh2' : 'none',
+    timestamp: new Date().toISOString()
   });
 });
 
 // 根路径信息
-app.get('/', (req, res) => {
+app.get('/', async (req, res) => {
+  // 检测sshpass可用性
+  if (sshpassAvailable === null) {
+    sshpassAvailable = await checkSshpassAvailability();
+  }
+  
   res.json({
     service: 'SSH Proxy Node.js Service',
-    version: '2.0.0',
-    description: '基于sshpass命令的SSH代理服务（与原始Python脚本相同方式）',
+    version: '2.1.0',
+    description: '智能SSH代理服务 - 优先使用sshpass命令，自动回退到ssh2库',
     endpoints: {
       '/execute': 'POST - 执行SSH命令',
       '/health': 'GET - 健康检查'
@@ -203,9 +266,14 @@ app.get('/', (req, res) => {
       'sshpass': '使用sshpass命令行工具（推荐，与原脚本相同）',
       'ssh2': '使用ssh2 Node.js库（备用方案）'
     },
+    currentStatus: {
+      'sshpassAvailable': sshpassAvailable,
+      'primaryMethod': sshpassAvailable ? 'sshpass' : 'ssh2',
+      'autoFallback': true
+    },
     usage: {
-      'default': '默认使用sshpass方法',
-      'specify_method': '在请求中添加 "method": "ssh2" 使用备用方案'
+      'default': '智能选择：优先sshpass，自动回退ssh2',
+      'force_ssh2': '在请求中添加 "method": "ssh2" 强制使用ssh2库'
     }
   });
 });
