@@ -4,8 +4,8 @@
   "description": "Simple SSH proxy for Cloudflare Workers - 服务器进程保活面板",
   "main": "ssh-proxy-simple.js",
   "scripts": {
-    "start": "node ssh-proxy-simple.js",
-    "dev": "nodemon ssh-proxy-simple.js"
+    "start": "node index.js",
+    "dev": "nodemon index.js"
   },
   "keywords": [
     "ssh",
