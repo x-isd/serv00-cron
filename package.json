@@ -1,30 +1,33 @@
 {
-  "name": "ssh-proxy-simple",
-  "version": "1.0.0",
-  "description": "Simple SSH proxy for Cloudflare Workers - 服务器进程保活面板",
-  "main": "ssh-proxy-simple.js",
+  "name": "ssh-proxy-sshpass",
+  "version": "2.0.0",
+  "description": "SSH代理服务 - 使用sshpass命令（与原始Python脚本相同方式）",
+  "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "ssh2": "^1.15.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
   },
   "keywords": [
     "ssh",
     "proxy",
-    "cloudflare-workers",
-    "nezha",
-    "server-monitoring"
+    "sshpass",
+    "server",
+    "automation"
   ],
   "author": "NexusCore",
   "license": "MIT",
-  "dependencies": {
-    "express": "^4.18.2",
-    "ssh2": "^1.14.0",
-    "cors": "^2.8.5"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/ssh-proxy-sshpass.git"
   },
-  "devDependencies": {
-    "nodemon": "^3.0.1"
-  },
-  "engines": {
-    "node": ">=16.0.0"
-  }
+  "homepage": "https://github.com/your-username/ssh-proxy-sshpass#readme"
 }
