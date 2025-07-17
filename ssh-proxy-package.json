@@ -1,0 +1,30 @@
+{
+  "name": "ssh-proxy-simple",
+  "version": "1.0.0",
+  "description": "Simple SSH proxy for Cloudflare Workers - 服务器进程保活面板",
+  "main": "ssh-proxy-simple.js",
+  "scripts": {
+    "start": "node ssh-proxy-simple.js",
+    "dev": "nodemon ssh-proxy-simple.js"
+  },
+  "keywords": [
+    "ssh",
+    "proxy",
+    "cloudflare-workers",
+    "nezha",
+    "server-monitoring"
+  ],
+  "author": "NexusCore",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "ssh2": "^1.14.0",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
