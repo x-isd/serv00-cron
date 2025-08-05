@@ -1,0 +1,31 @@
+# Koyeb Python版本专用Dockerfile
+# 解决sshpass安装权限问题
+
+FROM python:3.11-slim
+
+# 安装系统依赖，包括sshpass
+RUN apt-get update && \
+    apt-get install -y sshpass openssh-client && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# 设置工作目录
+WORKDIR /app
+
+# 复制依赖文件
+COPY requirements.txt .
+
+# 安装Python依赖
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 复制应用文件
+COPY app-koyeb.py .
+
+# 验证sshpass安装
+RUN sshpass -V
+
+# 暴露端口
+EXPOSE 8000
+
+# 启动命令
+CMD ["python", "app-koyeb.py"]
